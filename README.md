@@ -15,3 +15,5 @@ Extract OperationOctoArchipelago.zip so that config.json is in the "Mods" folder
 Edit config.json to change slot name/port number/server
 
 Launch the game and it will connect on startup
+
+Also hold space to play at 2x speed
