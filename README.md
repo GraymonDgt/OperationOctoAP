@@ -16,4 +16,6 @@ Edit config.json to change slot name/port number/server
 
 Launch the game and it will connect on startup
 
+You will need the archipelago text client for hints/ logs
+
 Also hold space to play at 2x speed
