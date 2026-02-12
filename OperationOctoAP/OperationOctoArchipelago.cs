@@ -5,8 +5,10 @@ using Archipelago.MultiClient.Net.Models;
 using Archipelago.MultiClient.Net.Packets;
 using HarmonyLib;
 using MelonLoader;
+using MelonLoader.TinyJSON;
 using Newtonsoft;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -23,13 +25,15 @@ using static System.Runtime.CompilerServices.RuntimeHelpers;
 
 namespace OperationOctoAP
 {
-    
+
     public class OperationOctoAPMod : MelonMod
     {
         public GameObject canvaslevelselectGl;
         public GameObject gameManagerGl;
         public List<int> lastKnownShopList = new List<int>();
         public List<ShopItemDatabase> currentShopList = new List<ShopItemDatabase>();
+
+
 
         public FeatureDatabase elixirUnlock = new FeatureDatabase()
         {
@@ -169,8 +173,9 @@ namespace OperationOctoAP
             levelName = "Initial Test"
         };
 
-
-
+        public static float lastPearls;
+        public static bool deathLinkEnabled = false;
+        public static bool ringLinkEnabled = false;
         public const int maxItems = 210;
         public const int maxLocations = 250;
         public static int currentPlayerSlot;
@@ -181,6 +186,10 @@ namespace OperationOctoAP
         public PlayerHelper playerInfo;//this line
         public static ArchipelagoSession session = null;
         int curretShopCheck = 0;
+        bool pearlsExist = false;
+        public static bool killOdinWhenPossible = false;
+
+
 
         public override void OnLateInitializeMelon()
         {
@@ -469,9 +478,67 @@ namespace OperationOctoAP
                 Time.timeScale = 1.0f;
             }
 
+            if (killOdinWhenPossible)//wierd unity thread nonsense
+            {
+                var odinObject = GameObject.Find("Odin");
+                if (odinObject != null)
+                {
+                    var odinHealthComp = odinObject.GetComponent<OdinHealth>();
+                    odinHealthComp.TakeDamage(500, null, null, DamageType.Clam, true, true);
+                    killOdinWhenPossible = false;
+                }
+            }
+
+
+            if (ringLinkEnabled)
+            {
+
+
+                var flaskObject = GameObject.Find("Canvas_Battle/TopPanel/Flask");
+
+                if (flaskObject != null)
+                {
+
+                    var flaskComp = flaskObject.GetComponent<PearlFlask>();
 
 
 
+
+
+                    var intValue = flaskComp.pearlCount.CurrentValue;
+                    if (!pearlsExist)
+                    {
+                        lastPearls = intValue;
+                        pearlsExist = true;
+                    }
+
+                    if (intValue != lastPearls)
+                    {
+
+                        var dataDict = new Dictionary<string, JToken>
+                        {
+                            { "time", JToken.FromObject(System.DateTimeOffset.UtcNow.ToUnixTimeSeconds()) },
+                            { "source", JToken.FromObject(session.Players.ActivePlayer.Slot) },
+                            { "amount", JToken.FromObject((intValue)-(lastPearls)) }
+                        };
+
+                        session.Socket.SendPacket(new BouncePacket()
+                        {
+                            Tags = new List<string> { "RingLink" },
+                            Slots = new List<int> { session.Players.ActivePlayer.Slot },
+                            Data = dataDict
+                        });
+                        lastPearls = intValue;
+                        MelonLogger.Msg("sent ringlink packet");
+                    }
+                } else
+                {
+
+                    pearlsExist = false;
+
+
+                }
+            }
 
             CheckForNewItems(false);
 
@@ -601,12 +668,37 @@ namespace OperationOctoAP
             var loginSuccess = (LoginSuccessful)result;
 
             //ringLinkMode = session.DataStorage.GetSlotData();
-
+            session.Socket.PacketReceived += OnPacketReceived;
             var slotData = session.DataStorage.GetSlotData();
 
-            //session.Socket.PacketReceived += OnPacketReceived;
+            
+            foreach (KeyValuePair<string, object> arg in slotData)
+            {
+                //MelonLogger.Msg("Key: " + arg.Key);
+                //MelonLogger.Msg("Value: " + arg.Value.ToString());
+                if (arg.Key == "DeathLink" && arg.Value.ToString() != "0")
+                {
+                    MelonLogger.Msg("enabled deathlink");
+                    deathLinkEnabled = true;//add more later
+                }
 
+                if (arg.Key == "RingLink" && arg.Value.ToString() != "0")
+                {
+                    MelonLogger.Msg("enabled ringlink");
+                    ringLinkEnabled = true;//add more later
+                }
+            }
 
+            if (ringLinkEnabled)
+            {
+                if (deathLinkEnabled) { session.ConnectionInfo.UpdateConnectionOptions(new[] { "DeathLink", "RingLink" }); }
+                else { session.ConnectionInfo.UpdateConnectionOptions(new[] { "RingLink" }); }
+
+            }
+            else if (deathLinkEnabled)
+            {
+                session.ConnectionInfo.UpdateConnectionOptions(new[] { "DeathLink" });
+            }
 
             ILocationCheckHelper locationHelper = session.Locations;
 
@@ -813,7 +905,70 @@ namespace OperationOctoAP
         }
 
 
+        public void OnPacketReceived(ArchipelagoPacketBase packet) //what the fuck is static and i might have to add it back when i discover some bs bug
+        {
+            //MelonLogger.Msg(packet);
+            if (packet.GetType() == typeof(BouncedPacket))
+            {
 
+                JObject jObject = packet.ToJObject();
+                foreach (var tag in jObject["tags"])
+                {
+
+
+
+
+
+                    if ((string)tag == "DeathLink")
+                    {
+
+                        killOdinWhenPossible = true;
+                            
+                        
+                        MelonLogger.Msg("received deathlink");
+                    }
+
+                    if ((string)tag == "RingLink")
+
+                    {
+                        try
+                        {
+                            foreach (var slotNum in jObject["slots"])
+                            { //
+                                if ((int)slotNum == session.Players.ActivePlayer.Slot)
+                                {
+                                    return;
+                                }
+                            }
+                        }
+                        catch (System.NullReferenceException)
+                        { MelonLogger.Msg("Ringlink packet recieved from SA1 or SA2"); }
+                        catch (System.Exception)
+                        { MelonLogger.Msg("Ringlink packet recieved from SA1 or SA2 (1)"); }
+                        var data = jObject["data"];
+                        int amount = data.Value<int>("amount");
+
+                        var flaskObject = GameObject.Find("Canvas_Battle/TopPanel/Flask");
+                        if (flaskObject == null) { continue; }
+                        var flaskComp = flaskObject.GetComponent<PearlFlask>();
+
+
+
+
+                        flaskComp.pearlCount.CurrentValue += amount;
+
+                        lastPearls = flaskComp.pearlCount.CurrentValue;
+
+
+                        flaskComp.PearlFlask_OnPearlCountChanged(null, null);
+
+
+                    }
+                }
+            }
+        }
+
+        
 
 
 
@@ -1064,9 +1219,46 @@ namespace OperationOctoAP
 
         }//ShopItemCard.SetItemPrice(int, CurrencyType)
 
+        [HarmonyPatch(typeof(Odin), "OnOdinDeadEvents")]
+
+        public static class Patch4
+        {
+            private static void Postfix()
+            {
+                if (deathLinkEnabled)
+                {
+
+                    MelonLogger.Msg("You died!");
+                    string deathMessage = session.Players.ActivePlayer.Name+" died";
+                    //send deathlink packet
+                    var dataDict = new Dictionary<string, JToken>
+                        {
+                            { "time", JToken.FromObject(System.DateTimeOffset.UtcNow.ToUnixTimeSeconds()) },
+                            { "source", JToken.FromObject(session.Players.ActivePlayer.Slot) },
+                            { "cause", JToken.FromObject(deathMessage) }
+                        };
+
+                    session.Socket.SendPacket(new BouncePacket()
+                    {
+                        Tags = new List<string> { "DeathLink" },
+                        Slots = new List<int> { session.Players.ActivePlayer.Slot },
+                        Data = dataDict
+                    });
+
+                }
 
 
-       [HarmonyPatch(typeof(BucketWindow_Quest), "GiveFishies")]
+
+
+            }
+
+
+
+            }
+
+
+
+                [HarmonyPatch(typeof(BucketWindow_Quest), "GiveFishies")]
        public static class Patch3
        {
            private static void Prefix()
