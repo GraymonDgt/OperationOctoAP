@@ -465,10 +465,13 @@ namespace OperationOctoAP
                 { return; }
             }
 
-
+            var gameMan = gameManagerGl.GetComponent<GameManager>();
+            if (gameMan != null) {gameMan.SetCheatDetectedDuringLevel(state: true); }//likely dont have to do this every frame
+       
 
 
             var ProgHelper = gameManagerGl.GetComponent<PlayerProgression>();
+
             if (Input.GetKey(KeyCode.Space))
             {
                 Time.timeScale = 2.0f;
@@ -484,7 +487,7 @@ namespace OperationOctoAP
                 if (odinObject != null)
                 {
                     var odinHealthComp = odinObject.GetComponent<OdinHealth>();
-                    odinHealthComp.TakeDamage(500, null, null, DamageType.Clam, true, true);
+                    odinHealthComp.TakeDamage(500, null, null, DamageType.Clam, true, true, false);
                     killOdinWhenPossible = false;
                 }
             }
@@ -528,8 +531,9 @@ namespace OperationOctoAP
                             Slots = new List<int> { session.Players.ActivePlayer.Slot },
                             Data = dataDict
                         });
+                        MelonLogger.Msg("sent "+(intValue-lastPearls).ToString()+" rings");
                         lastPearls = intValue;
-                        MelonLogger.Msg("sent ringlink packet");
+                        
                     }
                 } else
                 {
@@ -952,7 +956,7 @@ namespace OperationOctoAP
                         if (flaskObject == null) { continue; }
                         var flaskComp = flaskObject.GetComponent<PearlFlask>();
 
-
+                        MelonLogger.Msg("Received "+amount.ToString()+ " rings");
 
 
                         flaskComp.pearlCount.CurrentValue += amount;
