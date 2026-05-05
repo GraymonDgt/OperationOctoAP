@@ -20,6 +20,8 @@ using System.Threading.Tasks;
 using System.Xml.Linq;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using static MelonLoader.MelonLogger;
 using static System.Runtime.CompilerServices.RuntimeHelpers;
 
 
@@ -37,7 +39,7 @@ namespace OperationOctoAP
 
         public FeatureDatabase elixirUnlock = new FeatureDatabase()
         {
-            myName = "Elixers",
+            myName = "Elixers", 
             id = 0,
             prerequisiteLevel = null,
             featureType = FeatureDatabase.FeatureType.ElixirBottle,
@@ -165,7 +167,7 @@ namespace OperationOctoAP
             alsoUnlockGarageRegion = false,
             garageIdToUnlock = 0
         };
-        public LevelDatabase levelTemplate = new LevelDatabase()
+        public static LevelDatabase levelTemplate = new LevelDatabase()
         {
             levelBiome = Biome.Shallow,
             levelID = 0,
@@ -182,6 +184,8 @@ namespace OperationOctoAP
         public static bool[] unlockedArray = new bool[maxItems];
         public static bool[] checkedArray = new bool[maxLocations];
         public int treatQuestsCompleted = 0;
+        public static bool updateShopIcons = false;
+
 
         public PlayerHelper playerInfo;//this line
         public static ArchipelagoSession session = null;
@@ -215,44 +219,38 @@ namespace OperationOctoAP
                 }
             }
 
-            if (ProgHelper.SaveDataExistsForLevel(levelTemplate, out var levelSaveData))
-            {
-                levelSaveData.unlocked = false;
-            }
+            ////if (ProgHelper.SaveDataExistsForLevel(levelTemplate, out var levelSaveData))
+            //{
+            //    levelSaveData.unlocked = false;
+            //}
+            ProgHelper.LevelComplete(new LevelDatabase { levelBiome = Biome.Poison, levelID = 15 });
 
-            //for (int i = 0; i < 16; i++)
-            //{
-            //    levelTemplate.levelID = i;
-            //    if (ProgHelper.SaveDataExistsForLevel(levelTemplate, out levelSaveData))
-            //    {
-            //        levelSaveData.unlocked = false;
-            //    }
-            //}
-            //levelTemplate.levelBiome = Biome.Poison;
-            //for (int i = 0; i < 16; i++)
-            //{
-            //    levelTemplate.levelID = i;
-            //    if (ProgHelper.SaveDataExistsForLevel(levelTemplate, out levelSaveData))
-            //    {
-            //        levelSaveData.unlocked = false;
-            //    }
-            //}
-            //levelTemplate.levelBiome = Biome.Deep;
-            //for (int i = 0; i < 16; i++)
-            //{
-            //    levelTemplate.levelID = i;
-            //    if (ProgHelper.SaveDataExistsForLevel(levelTemplate, out levelSaveData))
-            //    {
-            //        levelSaveData.unlocked = false;
-            //    }
-            //}
 
 
 
             //UniDatabaseRef.allTurrets
 
+            string logoPath = System.IO.Path.Combine(modFolder, "APAssets/archipelago_icon.png");
 
-            if (System.IO.File.Exists(jsonPath))
+            if (System.IO.File.Exists(logoPath)) {
+
+                Texture2D tex = new Texture2D(1, 1);
+                byte[] logoBytes = System.IO.File.ReadAllBytes(logoPath);
+                ImageConversion.LoadImage(tex, logoBytes);
+                Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(tex.width / 2, tex.height / 2));
+
+
+
+
+
+            } else
+            {
+                MelonLogger.Msg("couldnt find logo");
+            }
+
+
+
+                if (System.IO.File.Exists(jsonPath))
             {
                 string jsonContent = System.IO.File.ReadAllText(jsonPath);
                 // Deserialize if needed
@@ -467,7 +465,7 @@ namespace OperationOctoAP
 
             var gameMan = gameManagerGl.GetComponent<GameManager>();
             if (gameMan != null) {gameMan.SetCheatDetectedDuringLevel(state: true); }//likely dont have to do this every frame
-       
+            // if you remove this to chest you are big stinky
 
 
             var ProgHelper = gameManagerGl.GetComponent<PlayerProgression>();
@@ -717,20 +715,7 @@ namespace OperationOctoAP
 
             }
             var ProgHelper = gameManagerGl.GetComponent<PlayerProgression>();
-            //for (int i = 1; i < 16; i++)
-            //{
-            //    if (checkedArray[i]) { ProgHelper.LevelComplete(new LevelDatabase { levelBiome = Biome.Shallow, levelID = i }); }
-            //}
-            //
-            //for (int i = 1; i < 16; i++)
-            //{
-            //    if (checkedArray[i + 15]) { ProgHelper.LevelComplete(new LevelDatabase { levelBiome = Biome.Poison, levelID = i }); }
-            //}
-            //for (int i = 1; i < 16; i++)
-            //{
-            //    if (checkedArray[i + 30]) { ProgHelper.LevelComplete(new LevelDatabase { levelBiome = Biome.Deep, levelID = i }); }
-            //}
-            //
+
 
         }
 
@@ -813,7 +798,8 @@ namespace OperationOctoAP
                 { ProgHelper.TurretUnlock(23); }
                 if (networkItem.ItemId == 32)//harvest barreleye
                 { ProgHelper.TurretUnlock(25); }
-
+                if (networkItem.ItemId == 33)//axe-o-lotl
+                { ProgHelper.TurretUnlock(35); }
 
 
                 // zappy jelly 9
@@ -1153,6 +1139,11 @@ namespace OperationOctoAP
                     ProgHelper.SaveDataExistsForTurret(25, out saveDataTur);
                     saveDataTur.unlocked = false; saveDataTur.revealed = false;
                 }
+                if (!unlockedArray[33] && ProgHelper.IsTurretUnlocked(35))
+                {
+                    ProgHelper.SaveDataExistsForTurret(25, out saveDataTur);
+                    saveDataTur.unlocked = false; saveDataTur.revealed = false;
+                }
             }
         }
 
@@ -1212,7 +1203,7 @@ namespace OperationOctoAP
 
 
                             //edit shop item data to be null
-                        
+                        //search for all items in shop
 
 
                     }
@@ -1222,6 +1213,37 @@ namespace OperationOctoAP
             }
 
         }//ShopItemCard.SetItemPrice(int, CurrencyType)
+
+
+        [HarmonyPatch(typeof(LevelHub), "PostLoadSetup")]
+
+        public static class Patch6
+        {
+            private static void Prefix(LevelHub __instance)
+            {
+
+                int biomeOffset = 0;
+                if (__instance.levelData.levelBiome == Biome.Poison) { biomeOffset = 15; }
+                if (__instance.levelData.levelBiome == Biome.Deep) { biomeOffset = 30; }
+                if (checkedArray[__instance.levelData.levelID + biomeOffset] == true)
+                {
+                    __instance.Completed = true;
+                }
+                else { __instance.Completed = false; }
+
+                if (checkedArray[__instance.levelData.levelID + biomeOffset - 1] == true)
+                {
+                    __instance.Unlocked = true;
+                }
+                else { if (__instance.Completed == false) { __instance.Unlocked = false; } else { __instance.Unlocked = true; } }
+
+
+                if (unlockedArray[202]&(__instance.levelData.levelID+biomeOffset)==31) { __instance.Unlocked = true; }
+
+            }
+            }
+
+
 
         [HarmonyPatch(typeof(Odin), "OnOdinDeadEvents")]
 
@@ -1275,6 +1297,7 @@ namespace OperationOctoAP
                    if (i > 10) { break; }
                }
                 MelonLogger.Msg("Sent bucket check " + (i + 1));
+                checkedArray[200 + i] = true;
                 session.Locations.CompleteLocationChecks(200+i);
 
                
@@ -1655,7 +1678,11 @@ namespace OperationOctoAP
                     ProgHelper.SaveDataExistsForTurret(25, out saveDataTur);
                     saveDataTur.unlocked = false; saveDataTur.revealed = false;
                 }
-
+                if (!unlockedArray[33] && ProgHelper.IsTurretUnlocked(35))
+                {
+                    ProgHelper.SaveDataExistsForTurret(35, out saveDataTur);
+                    saveDataTur.unlocked = false; saveDataTur.revealed = false;
+                }
 
 
                 SaveData_Feature saveData;
