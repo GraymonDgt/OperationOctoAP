@@ -54,6 +54,7 @@ turret_item_data_table: dict[str, OctoItemData] = {
     "Shooting Star": OctoItemData(30),
     "Watchdog": OctoItemData(31),
     "Harvest Barreleye": OctoItemData(32),
+    "Axe-o-lotl": OctoItemData(33),
 
 }
 feature_item_data_table: dict[str, OctoItemData] = {
